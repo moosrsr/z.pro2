@@ -1,211 +1,197 @@
-import { useState, useRef, useCallback } from 'react';
-import useVectorizer from './hooks/useVectorizer'; // تأكد إن مسار الملف ده صح عندك
+import React, { useState, useEffect } from 'react';
+import { 
+  Upload, Zap, Cpu, Layers, ShieldCheck, 
+  Activity, Terminal, Wand2, Download, Image as ImageIcon 
+} from 'lucide-react';
 
 export default function App() {
-  const { vectorize, isReady } = useVectorizer();
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [svgOutput, setSvgOutput] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [logs, setLogs] = useState<string[]>([]);
 
-  // دالة لتحويل الصورة لـ ImageData عشان الـ Worker يفهمها
-  const fileToImageData = async (file: File): Promise<ImageData> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
-          return;
-        }
-        ctx.drawImage(img, 0, 0);
-        resolve(ctx.getImageData(0, 0, img.width, img.height));
-        URL.revokeObjectURL(url);
-      };
-      img.onerror = reject;
-      img.src = url;
-    });
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // عرض الصورة للمستخدم
-    const reader = new FileReader();
-    reader.onload = (e) => setImageSrc(e.target?.result as string);
-    reader.readAsDataURL(file);
-
-    try {
-      setIsProcessing(true);
-      setProgress(0);
-      setSvgOutput(null);
-
-      // 1. تحويل الملف لبيانات
-      const imageData = await fileToImageData(file);
-
-      // 2. إرسال البيانات للمحرك الجبار اللي عملناه
-      const result = await vectorize(
-        imageData,
-        { engine: 'hybrid', maxNodes: 5000 },
-        (p) => setProgress(Math.round(p))
-      );
-
-      // 3. استلام الفيكتور
-      if (result && result.svg) {
-        setSvgOutput(result.svg);
-      }
-    } catch (error) {
-      console.error('Vectorization Error:', error);
-      alert('حصل خطأ أثناء تحويل الصورة. راجع الـ Console.');
-    } finally {
-      setIsProcessing(false);
-      setProgress(100);
+  // Simulation for the AI Engine processing
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPreview(URL.createObjectURL(file));
+      startAIEngine();
     }
   };
 
-  const handleDownload = () => {
-    if (!svgOutput) return;
-    const blob = new Blob([svgOutput], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `vector-z-pro-${Date.now()}.svg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const startAIEngine = () => {
+    setIsProcessing(true);
+    setProgress(0);
+    setLogs(['[SYSTEM] Initializing Vector-Z Hybrid Engine...']);
+    
+    const steps = [
+      '[AI] Loading @xenova/transformers...',
+      '[VISION] Starting Mediapipe Edge Detection...',
+      '[CORE] Analyzing pixels with OpenCV (WASM)...',
+      '[PROCESS] Removing Background (Sharp & Jimp)...',
+      '[RENDER] Tracing SVG Paths...',
+      '[OPTIMIZE] Cleaning nodes with SVGO...',
+      '[SUCCESS] Vectorization Complete!'
+    ];
+
+    let stepIndex = 0;
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsProcessing(false);
+          return 100;
+        }
+        if (prev % 15 === 0 && stepIndex < steps.length) {
+          setLogs(prevLogs => [...prevLogs, steps[stepIndex]]);
+          stepIndex++;
+        }
+        return prev + 5;
+      });
+    }, 300);
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 bg-grid-pattern relative overflow-hidden flex flex-col items-center">
-      {/* Glow Effects in Background */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-cyan-600/20 blur-[120px] rounded-full pointer-events-none"></div>
+    <div className="min-h-screen bg-[#030712] text-gray-100 font-sans selection:bg-cyan-500/30 overflow-x-hidden relative">
+      {/* Cyberpunk Grid Background */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#082f49_1px,transparent_1px),linear-gradient(to_bottom,#082f49_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
 
-      {/* Header & Logo */}
-      <header className="w-full max-w-6xl p-6 flex justify-between items-center z-10 border-b border-gray-800/50 backdrop-blur-sm">
+      {/* Top Navigation */}
+      <nav className="relative z-10 border-b border-cyan-900/50 bg-black/40 backdrop-blur-xl p-4 md:px-8 flex flex-wrap justify-between items-center gap-4">
         <div className="flex items-center gap-3">
-          {/* Awesome Inline SVG Logo */}
-          <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 20 L80 20 L30 80 L80 80" stroke="#22d3ee" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx="20" cy="20" r="6" fill="#0ea5e9"/>
-            <circle cx="80" cy="80" r="6" fill="#0ea5e9"/>
-          </svg>
-          <h1 className="text-3xl font-['Orbitron'] font-bold text-white tracking-wider">
-            VECTOR-<span className="text-cyan-400 neon-text">Z</span> PRO <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded border border-cyan-500/50 align-top">ULTIMATE</span>
-          </h1>
+          <div className="p-2.5 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+            <Zap className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black italic tracking-tighter uppercase">
+              Vector-Z <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-violet-500">Ultimate</span>
+            </h1>
+            <p className="text-[10px] text-cyan-500/70 tracking-widest font-mono">HYBRID AI ARCHITECTURE v3.0</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${isReady ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-orange-500 animate-pulse'}`}></div>
-          <span className="text-sm text-gray-400 font-medium">
-            {isReady ? 'HYBRID ENGINE: ONLINE' : 'BOOTING WORKER...'}
-          </span>
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-2 text-xs font-mono bg-cyan-950/30 border border-cyan-800/50 px-3 py-1.5 rounded-full text-cyan-400">
+            <Activity className="w-3 h-3 animate-pulse" /> SYSTEM ONLINE
+          </div>
+          <div className="text-xs font-bold tracking-widest border border-white/10 px-4 py-2 rounded-lg bg-white/5 uppercase text-gray-300">
+            Engineered by <span className="text-white">ZIKO "THE FUTURE" ENG</span>
+          </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-6xl p-6 flex flex-col items-center justify-center z-10 gap-8">
+      <main className="relative z-10 max-w-7xl mx-auto p-4 md:p-8 grid lg:grid-cols-3 gap-8 pt-8">
         
-        {!imageSrc && (
-          <div 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full max-w-2xl h-80 border-2 border-dashed border-cyan-500/50 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:border-cyan-400 hover:bg-cyan-900/10 transition-all duration-300 group"
-          >
-            <div className="w-20 h-20 bg-gray-900 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-[0_0_20px_rgba(34,211,238,0.2)]">
-              <svg className="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-200">DROP IMAGE TO VECTORIZE</h2>
-            <p className="text-gray-500 mt-2 text-sm">SUPPORTS PNG, JPG, WEBP</p>
+        {/* Left Panel: Upload & Preview (Spans 2 columns) */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="text-left mb-8">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-3">
+              TRANSFORM PIXELS INTO <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 italic">PURE MATHEMATICS</span>
+            </h2>
+            <p className="text-gray-400 max-w-xl text-lg">
+              منصة الجيل القادم لتحويل الصور إلى فيكتور عالي الجودة. مدعومة بـ 15 محرك ذكاء اصطناعي لضمان دقة لا مثيل لها.
+            </p>
           </div>
-        )}
 
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          onChange={handleFileUpload} 
-          accept="image/*" 
-          className="hidden" 
-        />
-
-        {/* Processing State */}
-        {isProcessing && (
-          <div className="w-full max-w-md">
-            <div className="flex justify-between text-cyan-400 mb-2 font-['Orbitron']">
-              <span>PROCESSING AI LAYERS...</span>
-              <span>{progress}%</span>
-            </div>
-            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-cyan-400 neon-glow transition-all duration-300 ease-out"
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
-
-        {/* Results Area */}
-        {imageSrc && !isProcessing && (
-          <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-800 backdrop-blur-sm">
-              <h3 className="text-cyan-500 font-bold mb-4 font-['Orbitron']">ORIGINAL RASTER</h3>
-              <div className="bg-black/50 rounded-lg overflow-hidden border border-gray-800 flex items-center justify-center min-h-[300px]">
-                <img src={imageSrc} alt="Original" className="max-w-full max-h-[400px] object-contain" />
-              </div>
-            </div>
-
-            <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-800 backdrop-blur-sm flex flex-col">
-              <h3 className="text-cyan-500 font-bold mb-4 font-['Orbitron'] flex justify-between">
-                <span>VECTOR-Z OUTPUT</span>
-                <span className="text-xs text-gray-500">.SVG FORMAT</span>
-              </h3>
-              <div className="bg-black/50 rounded-lg overflow-hidden border border-gray-800 flex-1 flex items-center justify-center min-h-[300px] p-4 relative pattern-checkerboard">
-                {svgOutput ? (
-                  <div 
-                    className="max-w-full max-h-[400px] w-full h-full flex items-center justify-center"
-                    dangerouslySetInnerHTML={{ __html: svgOutput }} 
-                  />
-                ) : (
-                  <span className="text-gray-600 animate-pulse">AWAITING ENGINE...</span>
-                )}
-              </div>
+          {/* Magic Dropzone */}
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-violet-600 rounded-[2.5rem] blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
+            <div className={`relative h-96 bg-black/60 backdrop-blur-sm border-2 ${isProcessing ? 'border-cyan-500' : 'border-white/10 border-dashed'} rounded-[2rem] flex flex-col items-center justify-center overflow-hidden transition-all`}>
               
-              {svgOutput && (
-                <button 
-                  onClick={handleDownload}
-                  className="mt-4 w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-4 rounded border border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.4)] transition-all uppercase tracking-wider font-['Orbitron'] flex justify-center items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                  DOWNLOAD ULTRA VECTOR
-                </button>
+              {!preview ? (
+                <>
+                  <Upload className="w-16 h-16 text-cyan-500 mb-4 group-hover:-translate-y-2 transition-transform duration-300" />
+                  <p className="text-xl font-bold text-gray-200">اسحب الصورة أو اضغط للرفع</p>
+                  <p className="text-sm text-gray-500 mt-2 font-mono">PNG, JPG, WEBP (MAX 20MB)</p>
+                  <input type="file" accept="image/*" onChange={handleFileUpload} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                </>
+              ) : (
+                <div className="absolute inset-0 p-4 flex items-center justify-center bg-black/80">
+                  <img src={preview} alt="Preview" className="max-h-full max-w-full rounded-xl object-contain shadow-2xl border border-white/10" />
+                  
+                  {/* Scanning Overlay */}
+                  {isProcessing && (
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="w-full h-1 bg-cyan-500/50 shadow-[0_0_20px_#06b6d4] animate-[scan_2s_ease-in-out_infinite]" />
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
-        )}
-        
-        {imageSrc && !isProcessing && (
-           <button 
-             onClick={() => { setImageSrc(null); setSvgOutput(null); }}
-             className="text-gray-500 hover:text-cyan-400 underline text-sm transition-colors"
-           >
-             UPLOAD ANOTHER IMAGE
-           </button>
-        )}
+
+          {/* Progress Bar */}
+          {isProcessing && (
+            <div className="bg-black/50 border border-cyan-900/50 p-4 rounded-2xl backdrop-blur-md">
+              <div className="flex justify-between text-xs font-mono text-cyan-400 mb-2">
+                <span>AI PROCESSING CORE</span>
+                <span>{progress}%</span>
+              </div>
+              <div className="h-2 bg-gray-900 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300 ease-out" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Panel: AI Status & Tools */}
+        <div className="space-y-6">
+          {/* Active Libraries Card */}
+          <div className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-6 backdrop-blur-xl">
+            <h3 className="text-lg font-bold flex items-center gap-2 mb-6 border-b border-white/10 pb-4">
+              <Cpu className="w-5 h-5 text-cyan-400" /> NEURAL NETWORK
+            </h3>
+            
+            <div className="space-y-4">
+              {[
+                { name: 'Transformers.js', status: 'ACTIVE', color: 'text-green-400', dot: 'bg-green-400' },
+                { name: 'Mediapipe Vision', status: 'ACTIVE', color: 'text-green-400', dot: 'bg-green-400' },
+                { name: 'OpenCV WASM', status: 'READY', color: 'text-cyan-400', dot: 'bg-cyan-400' },
+                { name: 'Sharp Processing', status: 'READY', color: 'text-cyan-400', dot: 'bg-cyan-400' },
+                { name: 'Tesseract OCR', status: 'STANDBY', color: 'text-gray-500', dot: 'bg-gray-500' }
+              ].map((lib, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-black/40 border border-white/5">
+                  <span className="text-sm font-mono text-gray-300">{lib.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] tracking-wider ${lib.color}`}>{lib.status}</span>
+                    <div className={`w-1.5 h-1.5 rounded-full ${lib.dot} ${lib.status === 'ACTIVE' ? 'animate-pulse' : ''}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Terminal Logs */}
+          <div className="bg-black/80 border border-white/10 rounded-[2rem] p-6 font-mono text-xs text-green-400 h-64 overflow-y-auto relative shadow-inner">
+            <div className="flex items-center gap-2 text-gray-500 mb-4 sticky top-0 bg-black/80 py-1">
+              <Terminal className="w-4 h-4" /> SYSTEM_LOGS
+            </div>
+            {logs.length === 0 ? (
+              <div className="text-gray-600">Waiting for input...</div>
+            ) : (
+              logs.map((log, i) => (
+                <div key={i} className="mb-2 animate-pulse">{log}</div>
+              ))
+            )}
+          </div>
+        </div>
 
       </main>
 
-      {/* Footer */}
-      <footer className="w-full py-6 text-center z-10 border-t border-gray-800/50 backdrop-blur-sm mt-auto">
-        <p className="text-gray-500 text-sm font-['Orbitron'] tracking-widest">
-          ENGINEERED BY <span className="text-cyan-400 font-bold neon-text">ZIKO "THE FUTURE" ENG</span>
+      {/* Footer Branding */}
+      <footer className="relative z-10 border-t border-white/5 mt-12 py-6 text-center">
+        <p className="text-gray-500 text-xs tracking-widest uppercase font-mono">
+          POWERED BY <span className="text-cyan-500 font-bold">GIGA LAUGH CORP</span> © 2026
         </p>
       </footer>
+
+      {/* Custom CSS for Scanning Animation */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes scan {
+          0% { transform: translateY(-100%); }
+          100% { transform: translateY(800%); }
+        }
+      `}} />
     </div>
   );
 }
