@@ -16,7 +16,12 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@utils': path.resolve(__dirname, './src/utils'),
+      '@components': path.resolve(__dirname, './src/components'),
+      '@hooks': path.resolve(__dirname, './src/hooks'),
+      '@store': path.resolve(__dirname, './src/store'),
+      '@types': path.resolve(__dirname, './src/types'),
       '@workers': path.resolve(__dirname, './src/workers'),
+      '@config': path.resolve(__dirname, './src/config'),
     },
   },
   worker: {
@@ -25,14 +30,18 @@ export default defineConfig({
   },
   build: {
     target: 'ESNext',
-    minify: 'esbuild', // ده الإصلاح الوحيد لضمان الرفع السريع
+    outDir: 'dist',
+    minify: 'esbuild', 
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) return 'vendor';
+          if (id.includes('node_modules')) {
+            if (id.includes('transformers') || id.includes('mediapipe')) return 'vendor-ai';
+            return 'vendor-libs';
+          }
         },
       },
     },
-    chunkSizeWarningLimit: 5000,
+    chunkSizeWarningLimit: 3000,
   },
 })
